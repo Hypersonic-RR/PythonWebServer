@@ -2,6 +2,8 @@
 from socket import *
 import sys # In order to terminate the program
 import thread
+from socket import error as socket_error
+import errno
 
 clients = []
 
@@ -13,13 +15,22 @@ serverSocket.listen(5)
 
 def handler(clientsock, addr):
     while 1:
-        data = clientsock.recv(1024)
+        try:
+            data = clientsock.recv(1024)
+        except socket_error as serr:
+            if serr == errno.ECONNREFUSED or serr == errno.ECONNRESET:
+                clients.pop(clientsock)
+                thread.exit()
         for c in clients:
             if c != clientsock:
-                c.sendall(data)
+                try:
+                    c.sendall(data)
+                except socket_error as e:
+                    if e == errno.EPIPE:
+                        clients.pop(c)
         
 def main():
-    while True:
+    while 1:
         print '> waiting for connection...'
         connectionSocket, addr = serverSocket.accept()
         print '> connected from ', addr
